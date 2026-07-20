@@ -140,7 +140,7 @@
 
     .aiw-launcher:hover { transform: translateY(-2px); box-shadow: 0 16px 38px rgba(38,31,29,.24); }
     .aiw-launcher:focus-visible, .aiw-icon-button:focus-visible, .aiw-action:focus-visible,
-    .aiw-send:focus-visible, .aiw-suggestion:focus-visible, .aiw-input:focus-visible {
+    .aiw-send:focus-visible, .aiw-suggestion:focus-visible {
       outline: 3px solid rgba(255,107,87,.28);
       outline-offset: 2px;
     }
@@ -867,7 +867,7 @@
         <div class="aiw-suggestions">
           <button class="aiw-suggestion" type="button">Как изменить цену?</button>
           <button class="aiw-suggestion" type="button">Почему товар не виден?</button>
-          <button class="aiw-suggestion" type="button">Создать тикет</button>
+          <button class="aiw-suggestion" type="button" data-action="ticket">Создать тикет</button>
         </div>
         <form class="aiw-composer">
           <textarea class="aiw-input" rows="1" aria-label="Вопрос AI-помощнику Тильды" placeholder="Задайте уточняющий вопрос"></textarea>
@@ -911,6 +911,9 @@
       const ticketMeta = messages.querySelector('.aiw-ticket-meta');
       const ticketDescription = messages.querySelector('.aiw-ticket-description');
       const ticketLinkLabel = messages.querySelector('.aiw-ticket-link-label');
+
+      // Эти элементы должны работать и в сохранённой переписке, и в новом пустом чате.
+      messages.append(ticketCard, feedbackPrompt);
 
       const chatStates = {
         product: {
@@ -977,6 +980,8 @@
         chatCards.forEach((item) => item.removeAttribute('aria-current'));
         threadContent.hidden = true;
         emptyState.hidden = false;
+        ticketCard.hidden = true;
+        feedbackPrompt.hidden = true;
         setView('chat');
         messages.scrollTo({ top: 0 });
       });
@@ -1018,13 +1023,18 @@
         feedbackText.textContent = selected ? 'Ответ помог?' : 'Спасибо за оценку';
       });
 
+      const openTicketPrompt = () => {
+        feedbackPrompt.hidden = false;
+        window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
+      };
+
       dislikeButton.addEventListener('click', () => {
         const selected = dislikeButton.getAttribute('aria-pressed') === 'true';
         dislikeButton.setAttribute('aria-pressed', String(!selected));
         likeButton.setAttribute('aria-pressed', 'false');
         feedbackPrompt.hidden = selected;
         feedbackText.textContent = selected ? 'Ответ помог?' : 'Ответ не помог';
-        if (!selected) window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
+        if (!selected) openTicketPrompt();
       });
 
       feedbackTicket.addEventListener('click', () => {
@@ -1065,6 +1075,12 @@
 
       suggestions.forEach((button) => {
         button.addEventListener('click', () => {
+          if (button.dataset.action === 'ticket') {
+            input.value = '';
+            resizeInput();
+            openTicketPrompt();
+            return;
+          }
           input.value = button.textContent.trim();
           resizeInput();
           input.focus();
