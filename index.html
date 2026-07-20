@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI-помощник Тильды — встраиваемый мок</title>
   <style>
+    @font-face {
+      font-family: "Tilda Sans";
+      src: url("./TildaSans-VF.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 100 1000;
+      font-display: swap;
+    }
+
     :root {
       --demo-ink: #161616;
       --demo-muted: #737373;
@@ -23,7 +31,7 @@
       min-height: 100vh;
       color: var(--demo-ink);
       background: var(--demo-page);
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-family: "Tilda Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     }
 
     button, textarea { font: inherit; }
@@ -107,7 +115,7 @@
       bottom: 24px;
       z-index: 9999;
       color: var(--aiw-ink);
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-family: "Tilda Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       font-size: 14px;
       line-height: 1.45;
     }
