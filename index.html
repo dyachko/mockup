@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-помощник Тильды — встраиваемый мок</title>
+  <style>
+    :root {
+      --demo-ink: #161616;
+      --demo-muted: #737373;
+      --demo-line: #e5e5e5;
+      --demo-surface: #ffffff;
+      --demo-page: #f2f2f0;
+      --demo-accent: #ff6b57;
+      --demo-user: #dce7fb;
+      --demo-panel: #f7f7f6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--demo-ink);
+      background: var(--demo-page);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
+
+    button, textarea { font: inherit; }
+
+    /* Фоновая страница нужна только для демонстрации наложения виджета. */
+    .demo-page {
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(255,255,255,.82), rgba(255,255,255,.82)),
+        repeating-linear-gradient(90deg, transparent 0 79px, #ededeb 79px 80px);
+    }
+
+    .demo-topbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid #dededc;
+      background: rgba(255,255,255,.94);
+    }
+
+    .demo-brand { font-size: 15px; font-weight: 650; }
+    .demo-nav { display: flex; gap: 26px; color: #555; font-size: 13px; }
+    .demo-main { max-width: 1080px; margin: 0 auto; padding: 72px 32px 120px; }
+
+    .demo-kicker {
+      margin-bottom: 16px;
+      color: #878787;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .demo-main h1 {
+      max-width: 680px;
+      margin: 0 0 18px;
+      font-size: clamp(38px, 6vw, 72px);
+      font-weight: 500;
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+
+    .demo-main > p {
+      max-width: 530px;
+      margin: 0;
+      color: #646464;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 58px;
+    }
+
+    .demo-card {
+      min-height: 180px;
+      padding: 22px;
+      border: 1px solid #e1e1df;
+      border-radius: 14px;
+      background: rgba(255,255,255,.86);
+    }
+
+    .demo-card strong { display: block; margin-bottom: 42px; font-size: 15px; }
+    .demo-card span { color: #777; font-size: 13px; line-height: 1.45; }
+
+    /* Начало встраиваемого AI-виджета. */
+    .aiw-root {
+      --aiw-ink: #171717;
+      --aiw-muted: #7c7c7c;
+      --aiw-line: #dedede;
+      --aiw-panel: #f7f7f6;
+      --aiw-white: #fff;
+      --aiw-accent: #ff6b57;
+      --aiw-user: #dce7fb;
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 9999;
+      color: var(--aiw-ink);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .aiw-root *, .aiw-root *::before, .aiw-root *::after { box-sizing: border-box; }
+
+    .aiw-launcher {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      margin-left: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--aiw-accent);
+      box-shadow: 0 12px 34px rgba(38, 31, 29, .2);
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .aiw-launcher:hover { transform: translateY(-2px); box-shadow: 0 16px 38px rgba(38,31,29,.24); }
+    .aiw-launcher:focus-visible, .aiw-icon-button:focus-visible, .aiw-action:focus-visible,
+    .aiw-send:focus-visible, .aiw-suggestion:focus-visible, .aiw-input:focus-visible {
+      outline: 3px solid rgba(255,107,87,.28);
+      outline-offset: 2px;
+    }
+
+    .aiw-panel {
+      width: min(410px, calc(100vw - 32px));
+      height: min(700px, calc(100vh - 48px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 24px;
+      background: var(--aiw-panel);
+      box-shadow: 0 24px 70px rgba(25, 25, 25, .2);
+      transform-origin: right bottom;
+      animation: aiw-in .2s ease-out;
+    }
+
+    .aiw-root[data-open="false"] .aiw-panel { display: none; }
+    .aiw-root[data-open="true"] .aiw-launcher { display: none; }
+
+    @keyframes aiw-in {
+      from { opacity: 0; transform: translateY(10px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .aiw-header {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 16px 0 20px;
+      border-bottom: 1px solid var(--aiw-line);
+      background: rgba(255,255,255,.75);
+      backdrop-filter: blur(14px);
+    }
+
+    .aiw-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+    .aiw-sparkle {
+      width: 27px;
+      height: 27px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      color: var(--aiw-accent);
+    }
+
+    .aiw-title-text { min-width: 0; }
+    .aiw-title-text strong { display: block; font-size: 14px; font-weight: 650; }
+    .aiw-title-text span { display: block; color: var(--aiw-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .aiw-header-actions { display: flex; gap: 2px; }
+
+    .aiw-icon-button {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: #555;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .aiw-icon-button:hover { background: #ececeb; }
+
+    .aiw-history-toggle {
+      width: auto;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      padding: 0 10px;
+      gap: 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .aiw-history-toggle-text { line-height: 1; }
+
+    .aiw-history-back-icon { display: none; }
+    .aiw-root[data-view="history"] .aiw-history-icon { display: none; }
+    .aiw-root[data-view="history"] .aiw-history-back-icon { display: block; }
+
+    .aiw-history {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--aiw-panel);
+    }
+
+    .aiw-root[data-view="history"] .aiw-history { display: flex; }
+    .aiw-root[data-view="history"] .aiw-view-chat { display: none; }
+
+    .aiw-history-top {
+      padding: 22px 18px 15px;
+      border-bottom: 1px solid #e4e4e2;
+    }
+
+    .aiw-new-chat {
+      width: 100%;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 14px;
+      color: #fff;
+      background: var(--aiw-accent);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .aiw-new-chat:hover { background: #f25f4c; }
+
+    .aiw-history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      scrollbar-width: thin;
+      scrollbar-color: #c8c8c8 transparent;
+    }
+
+    .aiw-history-section + .aiw-history-section { margin-top: 22px; }
+
+    .aiw-history-heading {
+      margin: 0 0 8px 4px;
+      color: #8a8a8a;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .aiw-chat-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      gap: 11px;
+      align-items: center;
+      padding: 13px 12px;
+      border: 1px solid transparent;
+      border-radius: 15px;
+      color: var(--aiw-ink);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .aiw-chat-card + .aiw-chat-card { margin-top: 4px; }
+    .aiw-chat-card:hover { border-color: #e1e1df; background: rgba(255,255,255,.72); }
+    .aiw-chat-card[aria-current="true"] { border-color: #dededc; background: #fff; }
+
+    .aiw-chat-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #6f7890;
+      background: var(--aiw-user);
+    }
+
+    .aiw-chat-icon.aiw-chat-icon-coral { color: #bd4d3e; background: #ffe3de; }
+    .aiw-chat-icon.aiw-chat-icon-gray { color: #656565; background: #e9e9e7; }
+
+    .aiw-chat-copy { min-width: 0; }
+    .aiw-chat-copy strong { display: block; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .aiw-chat-copy span { display: block; margin-top: 3px; overflow: hidden; color: #858585; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .aiw-chat-meta { align-self: start; padding-top: 2px; color: #929292; font-size: 9px; }
+
+    .aiw-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .aiw-status::before { width: 5px; height: 5px; border-radius: 50%; background: #62a779; content: ""; }
+    .aiw-status-ticket::before { background: var(--aiw-accent); }
+
+    .aiw-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 18px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: #c8c8c8 transparent;
+    }
+
+    .aiw-context {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 18px;
+      padding: 7px 10px;
+      border: 1px solid #e0e0df;
+      border-radius: 999px;
+      color: #696969;
+      background: rgba(255,255,255,.7);
+      font-size: 11px;
+    }
+
+    .aiw-context-dot { width: 6px; height: 6px; border-radius: 50%; background: #57a574; }
+
+    .aiw-recommendations {
+      margin-bottom: 18px;
+      padding: 14px;
+      border: 1px solid #e1e1df;
+      border-radius: 15px;
+      background: rgba(255,255,255,.76);
+    }
+
+    .aiw-recommendations-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: #656565;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .02em;
+    }
+
+    .aiw-recommendations-title svg { color: var(--aiw-accent); }
+
+    .aiw-recommendation-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      color: #2b2b2b;
+      font-size: 11px;
+      line-height: 1.35;
+      text-decoration: none;
+    }
+
+    .aiw-recommendation-link + .aiw-recommendation-link { border-top: 1px solid #ececea; }
+    .aiw-recommendation-link:hover { color: var(--aiw-accent); }
+    .aiw-recommendation-link span:last-child { flex: 0 0 auto; color: #aaa; }
+
+    .aiw-row { display: flex; margin-bottom: 14px; }
+    .aiw-row-user { justify-content: flex-end; }
+
+    .aiw-user-bubble {
+      max-width: 83%;
+      padding: 13px 15px;
+      border-radius: 16px 16px 4px 16px;
+      background: var(--aiw-user);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .aiw-answer {
+      position: relative;
+      padding: 18px;
+      border: 1px solid #e0e0df;
+      border-radius: 18px 18px 18px 4px;
+      background: var(--aiw-white);
+    }
+
+    .aiw-answer-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 10px;
+      color: var(--aiw-accent);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .aiw-answer h2 { margin: 0 0 8px; font-size: 16px; font-weight: 650; }
+    .aiw-answer p { margin: 0; color: #3f3f3f; font-size: 13px; line-height: 1.55; }
+
+    .aiw-source {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 16px;
+      padding-top: 13px;
+      border-top: 1px solid #ededec;
+      color: var(--aiw-muted);
+      font-size: 11px;
+    }
+
+    .aiw-source a { color: var(--aiw-accent); text-decoration: none; }
+    .aiw-source a:hover { text-decoration: underline; }
+
+    .aiw-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+
+    .aiw-empty-state {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 42px 28px;
+      text-align: center;
+    }
+
+    .aiw-empty-state[hidden], .aiw-thread-content[hidden] { display: none !important; }
+
+    .aiw-empty-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+      border-radius: 15px;
+      color: var(--aiw-accent);
+      background: #ffe7e2;
+    }
+
+    .aiw-empty-state h2 { margin: 0 0 8px; font-size: 18px; font-weight: 650; }
+    .aiw-empty-state p { max-width: 270px; margin: 0; color: #737373; font-size: 12px; line-height: 1.55; }
+
+    .aiw-empty-context {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 18px;
+      padding: 7px 10px;
+      border: 1px solid #dfdfdd;
+      border-radius: 999px;
+      color: #6f6f6f;
+      background: #fff;
+      font-size: 10px;
+    }
+
+    .aiw-ticket-card {
+      margin-top: 12px;
+      padding: 15px;
+      border: 1px solid #ffc7bd;
+      border-radius: 16px;
+      background: #fff4f1;
+    }
+
+    .aiw-ticket-card[hidden] { display: none !important; }
+
+    .aiw-ticket-status {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .aiw-ticket-check {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--aiw-accent);
+    }
+
+    .aiw-ticket-copy { min-width: 0; }
+    .aiw-ticket-copy strong { display: block; font-size: 13px; font-weight: 650; }
+    .aiw-ticket-copy span { display: block; margin-top: 2px; color: #8b665f; font-size: 10px; }
+
+    .aiw-ticket-card p {
+      margin: 12px 0;
+      color: #664b46;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .aiw-ticket-link {
+      width: 100%;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 11px;
+      border: 1px solid #f1b8ae;
+      border-radius: 10px;
+      color: #4e3531;
+      background: rgba(255,255,255,.76);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .aiw-ticket-link:hover { background: #fff; }
+
+    .aiw-action {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border: 1px solid #dededc;
+      border-radius: 11px;
+      color: #303030;
+      background: rgba(255,255,255,.78);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .aiw-action:hover { border-color: #c9c9c7; background: #fff; }
+
+    .aiw-feedback {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding: 0 4px;
+      color: #8a8a8a;
+      font-size: 11px;
+    }
+
+    .aiw-feedback-buttons { display: flex; gap: 4px; }
+    .aiw-feedback .aiw-icon-button { width: 28px; height: 28px; }
+
+    .aiw-feedback .aiw-icon-button[aria-pressed="true"] {
+      color: #fff;
+      background: var(--aiw-accent);
+    }
+
+    .aiw-feedback-prompt {
+      margin-top: 8px;
+      padding: 13px;
+      border: 1px solid #e0e0de;
+      border-radius: 13px;
+      background: #fff;
+    }
+
+    .aiw-feedback-prompt[hidden] { display: none !important; }
+    .aiw-feedback-prompt strong { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 650; }
+    .aiw-feedback-prompt p { margin: 0 0 10px; color: #777; font-size: 10px; line-height: 1.45; }
+
+    .aiw-feedback-ticket {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 10px;
+      color: #fff;
+      background: var(--aiw-accent);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .aiw-feedback-ticket:hover { background: #f25f4c; }
+
+    .aiw-composer-wrap {
+      padding: 12px;
+      border-top: 1px solid var(--aiw-line);
+      background: rgba(247,247,246,.96);
+    }
+
+    .aiw-suggestions { display: flex; gap: 7px; overflow-x: auto; padding: 0 2px 9px; scrollbar-width: none; }
+    .aiw-suggestions::-webkit-scrollbar { display: none; }
+
+    .aiw-suggestion {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border: 1px solid #dededc;
+      border-radius: 999px;
+      color: #656565;
+      background: #fff;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .aiw-suggestion:hover { color: #202020; border-color: #c7c7c5; }
+
+    .aiw-composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 8px 8px 8px 13px;
+      border: 1px solid #d9d9d7;
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .aiw-input {
+      width: 100%;
+      min-height: 38px;
+      max-height: 92px;
+      resize: none;
+      padding: 9px 0 7px;
+      border: 0;
+      outline: 0;
+      color: #202020;
+      background: transparent;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .aiw-input::placeholder { color: #949494; }
+
+    .aiw-send {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--aiw-accent);
+      cursor: pointer;
+      transition: transform .16s ease, opacity .16s ease;
+    }
+
+    .aiw-send:hover { transform: scale(1.04); }
+    .aiw-send:disabled { opacity: .4; cursor: default; transform: none; }
+
+    .aiw-note { margin-top: 7px; color: #929292; font-size: 9px; text-align: center; }
+
+    .aiw-typing {
+      display: inline-flex;
+      gap: 4px;
+      padding: 13px 15px;
+      border: 1px solid #e1e1df;
+      border-radius: 16px 16px 16px 4px;
+      background: #fff;
+    }
+
+    .aiw-typing i { width: 5px; height: 5px; border-radius: 50%; background: #9b9b9b; animation: aiw-dot 1s infinite ease-in-out; }
+    .aiw-typing i:nth-child(2) { animation-delay: .13s; }
+    .aiw-typing i:nth-child(3) { animation-delay: .26s; }
+
+    @keyframes aiw-dot { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+    @media (max-width: 720px) {
+      .demo-nav { display: none; }
+      .demo-main { padding: 48px 20px 100px; }
+      .demo-grid { grid-template-columns: 1fr; }
+      .aiw-root { right: 12px; bottom: 12px; }
+      .aiw-panel { width: calc(100vw - 24px); height: calc(100dvh - 24px); border-radius: 20px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .aiw-panel, .aiw-launcher, .aiw-send, .aiw-typing i { animation: none; transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="demo-page">
+    <header class="demo-topbar">
+      <div class="demo-brand">MY LOVELY SHOP</div>
+      <nav class="demo-nav" aria-label="Навигация демо-страницы">
+        <span>Страницы</span><span>Настройки</span><span>Помощь</span>
+      </nav>
+    </header>
+    <section class="demo-main">
+      <div class="demo-kicker">Редактор каталога</div>
+      <h1>Товары и категории</h1>
+      <p>Демонстрационный фон показывает, как AI-помощник Тильды выглядит поверх обычной страницы интерфейса.</p>
+      <div class="demo-grid" aria-hidden="true">
+        <div class="demo-card"><strong>Карточка товара</strong><span>Название, цена, описание и изображение</span></div>
+        <div class="demo-card"><strong>Категории</strong><span>Структура каталога и порядок отображения</span></div>
+        <div class="demo-card"><strong>Публикация</strong><span>Проверка изменений перед обновлением страницы</span></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Скопируйте .aiw-root, стили с префиксом aiw- и скрипт ниже на нужную страницу. -->
+  <aside class="aiw-root" data-open="true" data-view="chat" aria-label="AI-помощник Тильды">
+    <button class="aiw-launcher" type="button" aria-label="Открыть AI-помощника Тильды" aria-expanded="false">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6.5 18.5 4 20l.8-3.2A7.3 7.3 0 0 1 3 12c0-4.1 4-7.5 9-7.5s9 3.4 9 7.5-4 7.5-9 7.5c-2 0-3.8-.5-5.5-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="m13.6 8.1.5 1.5c.2.5.6.9 1.1 1.1l1.5.5-1.5.5c-.5.2-.9.6-1.1 1.1l-.5 1.5-.5-1.5c-.2-.5-.6-.9-1.1-1.1l-1.5-.5 1.5-.5c.5-.2.9-.6 1.1-1.1l.5-1.5Z" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <section class="aiw-panel" role="dialog" aria-modal="false" aria-labelledby="aiw-title">
+      <header class="aiw-header">
+        <div class="aiw-title">
+          <span class="aiw-sparkle" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M10.8 2.5c.6 4.9 3.1 7.4 8 8-4.9.6-7.4 3.1-8 8-.6-4.9-3.1-7.4-8-8 4.9-.6 7.4-3.1 8-8Z" stroke="currentColor" stroke-width="1.7"/><path d="M20 16.2c.3 2.1 1.3 3.2 3.5 3.5-2.2.3-3.2 1.3-3.5 3.5-.3-2.2-1.3-3.2-3.5-3.5 2.2-.3 3.2-1.4 3.5-3.5Z" fill="currentColor"/></svg>
+          </span>
+          <div class="aiw-title-text">
+            <strong id="aiw-title">AI-помощник Тильды</strong>
+          </div>
+        </div>
+        <div class="aiw-header-actions">
+          <button class="aiw-icon-button aiw-history-toggle" type="button" aria-label="Открыть историю переписок" title="История">
+            <svg class="aiw-history-icon" width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 4.5h10v7H7.2L4 14v-2.5H3v-7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 14h5.8L16 16.5V8.2h-1.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="aiw-history-back-icon" width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m11.8 4.5-5.5 5.5 5.5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="aiw-history-toggle-text">История</span>
+          </button>
+          <button class="aiw-icon-button aiw-close" type="button" aria-label="Закрыть AI-помощника Тильды">
+            <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m4 4 12 12M16 4 4 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="aiw-history" aria-label="История переписок">
+        <div class="aiw-history-top">
+          <button class="aiw-new-chat" type="button">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 3v12M3 9h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            Новый чат
+          </button>
+        </div>
+        <div class="aiw-history-list">
+          <section class="aiw-history-section">
+            <h2 class="aiw-history-heading">Сегодня</h2>
+            <button class="aiw-chat-card" type="button" aria-current="true" data-chat-id="product" data-chat-title="Как изменить карточку товара?">
+              <span class="aiw-chat-icon">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 4.5h10v7H8l-3.5 2v-2H4v-7Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="aiw-chat-copy"><strong>Как изменить карточку товара?</strong><span class="aiw-status">Каталог товаров · ответ найден</span></span>
+              <span class="aiw-chat-meta">12:41</span>
+            </button>
+            <button class="aiw-chat-card" type="button" data-chat-id="ticket" data-chat-title="Почему товар не виден?">
+              <span class="aiw-chat-icon aiw-chat-icon-coral">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 2.5 16 15H2L9 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9 6.5v4M9 13h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </span>
+              <span class="aiw-chat-copy"><strong>Почему товар не виден?</strong><span class="aiw-status aiw-status-ticket">Публикация · создан тикет</span></span>
+              <span class="aiw-chat-meta">10:18</span>
+            </button>
+          </section>
+          <section class="aiw-history-section">
+            <h2 class="aiw-history-heading">Ранее</h2>
+            <button class="aiw-chat-card" type="button" data-chat-id="domain" data-chat-title="Как подключить домен?">
+              <span class="aiw-chat-icon aiw-chat-icon-gray">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M2.8 9h12.4M9 2.7c2.4 2.2 2.4 10.4 0 12.6M9 2.7c-2.4 2.2-2.4 10.4 0 12.6" stroke="currentColor" stroke-width="1.2"/></svg>
+              </span>
+              <span class="aiw-chat-copy"><strong>Как подключить домен?</strong><span class="aiw-status">Настройки сайта · ответ найден</span></span>
+              <span class="aiw-chat-meta">18 июл</span>
+            </button>
+            <button class="aiw-chat-card" type="button" data-chat-id="forms" data-chat-title="Не приходят заявки из формы">
+              <span class="aiw-chat-icon aiw-chat-icon-gray">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 4h12v10H3V4Zm0 2 6 4 6-4" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="aiw-chat-copy"><strong>Не приходят заявки из формы</strong><span class="aiw-status">Формы · ответ найден</span></span>
+              <span class="aiw-chat-meta">16 июл</span>
+            </button>
+          </section>
+        </div>
+      </section>
+
+      <div class="aiw-messages aiw-view-chat" aria-live="polite">
+        <section class="aiw-empty-state" aria-label="Новый тестовый чат" hidden>
+          <span class="aiw-empty-icon" aria-hidden="true">
+            <svg width="27" height="27" viewBox="0 0 27 27" fill="none"><path d="M11 2.8c.6 5 3.2 7.6 8.2 8.2-5 .6-7.6 3.2-8.2 8.2-.6-5-3.2-7.6-8.2-8.2 5-.6 7.6-3.2 8.2-8.2Z" stroke="currentColor" stroke-width="1.7"/><path d="M20.6 16.8c.3 2.1 1.4 3.2 3.5 3.5-2.1.3-3.2 1.4-3.5 3.5-.3-2.1-1.4-3.2-3.5-3.5 2.1-.3 3.2-1.4 3.5-3.5Z" fill="currentColor"/></svg>
+          </span>
+          <h2>Новый чат</h2>
+          <p>Задайте вопрос о Тильде. Помощник учтёт раздел, в котором вы сейчас находитесь.</p>
+          <span class="aiw-empty-context"><span class="aiw-context-dot"></span>Текущий экран: Каталог товаров</span>
+        </section>
+        <div class="aiw-thread-content">
+        <section class="aiw-recommendations" aria-label="Рекомендованные статьи для текущего экрана">
+          <div class="aiw-recommendations-title">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 3.4c1.8-.7 3.7-.4 5.5.8v9c-1.8-1.2-3.7-1.5-5.5-.8v-9Zm11 0c-1.8-.7-3.7-.4-5.5.8v9c1.8-1.2 3.7-1.5 5.5-.8v-9Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            Рекомендуем на этом экране
+          </div>
+          <a class="aiw-recommendation-link" href="https://help-ru.tilda.cc/online-store/catalog" target="_blank" rel="noopener noreferrer"><span>Добавление товаров в интернет-магазин</span><span aria-hidden="true">↗</span></a>
+          <a class="aiw-recommendation-link" href="https://help-ru.tilda.cc/online-store/catalog/category" target="_blank" rel="noopener noreferrer"><span>Создание разделов каталога</span><span aria-hidden="true">↗</span></a>
+        </section>
+        <div class="aiw-row aiw-row-user">
+          <div class="aiw-user-bubble">Как изменить карточку товара?</div>
+        </div>
+        <div class="aiw-row">
+          <article class="aiw-answer">
+            <div class="aiw-answer-label">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6.5 1.2c.4 3.2 2 4.8 5.2 5.2-3.2.4-4.8 2-5.2 5.2-.4-3.2-2-4.8-5.2-5.2 3.2-.4 4.8-2 5.2-5.2Z" fill="currentColor"/><path d="M12.5 10c.2 1.7 1.1 2.5 2.7 2.7-1.6.2-2.5 1-2.7 2.7-.2-1.7-1-2.5-2.7-2.7 1.7-.2 2.5-1 2.7-2.7Z" fill="currentColor"/></svg>
+              Ответ по текущему экрану
+            </div>
+            <h2>Что сделать</h2>
+            <p>Откройте нужный товар в каталоге, измените название, цену, описание или изображение, затем сохраните изменения и опубликуйте страницу.</p>
+            <div class="aiw-source">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 3.4c1.8-.7 3.7-.4 5.5.8v9c-1.8-1.2-3.7-1.5-5.5-.8v-9Zm11 0c-1.8-.7-3.7-.4-5.5.8v9c1.8-1.2 3.7-1.5 5.5-.8v-9Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span>Источник: <a href="#">Справка → Интернет-магазин</a></span>
+            </div>
+          </article>
+        </div>
+        <div class="aiw-actions">
+          <button class="aiw-action" type="button">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 2.5h7.5A1.5 1.5 0 0 1 12 4v9.5H4.5A1.5 1.5 0 0 1 3 12V2.5Z" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 5.5h4M5.5 8h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Открыть статью
+          </button>
+        </div>
+        <section class="aiw-ticket-card" aria-label="Созданный тикет" hidden>
+          <div class="aiw-ticket-status">
+            <span class="aiw-ticket-check" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="m3.2 8.2 3 3 6.6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="aiw-ticket-copy"><strong>Тикет создан</strong><span class="aiw-ticket-meta">№ 48291 · Поддержка Тильды</span></span>
+          </div>
+          <p class="aiw-ticket-description">В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.</p>
+          <button class="aiw-ticket-link" type="button"><span class="aiw-ticket-link-label">Открыть тикет № 48291</span><span aria-hidden="true">→</span></button>
+        </section>
+        <div class="aiw-feedback">
+          <span class="aiw-feedback-text">Ответ помог?</span>
+          <div class="aiw-feedback-buttons">
+            <button class="aiw-icon-button aiw-like" type="button" aria-label="Ответ полезен" aria-pressed="false">
+              <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.5 15H4a1.5 1.5 0 0 1-1.5-1.5V8H6m.5 7h6.2c.7 0 1.3-.5 1.5-1.2l1.1-4.5a1.5 1.5 0 0 0-1.5-1.8H11l.5-2.5c.2-1-.6-2-1.6-2L6.5 8v7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="aiw-icon-button aiw-dislike" type="button" aria-label="Ответ не помог" aria-pressed="false">
+              <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M11.5 3H14a1.5 1.5 0 0 1 1.5 1.5V10H12m-.5-7H5.3c-.7 0-1.3.5-1.5 1.2L2.7 8.7a1.5 1.5 0 0 0 1.5 1.8H7L6.5 13c-.2 1 .6 2 1.6 2l3.4-5V3Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <section class="aiw-feedback-prompt" aria-label="Предложение создать тикет" hidden>
+          <strong>Передать вопрос в поддержку?</strong>
+          <p>К тикету приложим ваш вопрос, ответ помощника и контекст текущего экрана.</p>
+          <button class="aiw-feedback-ticket" type="button">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 5.5h11v7h-11v-7Zm2-2h7M8 8v2M7 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Создать тикет
+          </button>
+        </section>
+        </div>
+      </div>
+
+      <footer class="aiw-composer-wrap aiw-view-chat">
+        <div class="aiw-suggestions">
+          <button class="aiw-suggestion" type="button">Как изменить цену?</button>
+          <button class="aiw-suggestion" type="button">Почему товар не виден?</button>
+          <button class="aiw-suggestion" type="button">Создать тикет</button>
+        </div>
+        <form class="aiw-composer">
+          <textarea class="aiw-input" rows="1" aria-label="Вопрос AI-помощнику Тильды" placeholder="Задайте уточняющий вопрос"></textarea>
+          <button class="aiw-send" type="submit" aria-label="Отправить вопрос" disabled>
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m4 10 6-6 6 6M10 4v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </form>
+        <div class="aiw-note">AI может ошибаться — проверяйте важную информацию</div>
+      </footer>
+    </section>
+  </aside>
+
+  <script>
+    (() => {
+      const root = document.querySelector('.aiw-root');
+      const panel = root.querySelector('.aiw-panel');
+      const launcher = root.querySelector('.aiw-launcher');
+      const close = root.querySelector('.aiw-close');
+      const historyToggle = root.querySelector('.aiw-history-toggle');
+      const newChat = root.querySelector('.aiw-new-chat');
+      const chatCards = root.querySelectorAll('.aiw-chat-card');
+      const title = root.querySelector('#aiw-title');
+      const historyToggleText = root.querySelector('.aiw-history-toggle-text');
+      const form = root.querySelector('.aiw-composer');
+      const input = root.querySelector('.aiw-input');
+      const send = root.querySelector('.aiw-send');
+      const messages = root.querySelector('.aiw-messages');
+      const suggestions = root.querySelectorAll('.aiw-suggestion');
+      const userBubble = messages.querySelector('.aiw-user-bubble');
+      const answerHeading = messages.querySelector('.aiw-answer h2');
+      const answerText = messages.querySelector('.aiw-answer p');
+      const sourceLink = messages.querySelector('.aiw-source a');
+      const ticketCard = messages.querySelector('.aiw-ticket-card');
+      const emptyState = messages.querySelector('.aiw-empty-state');
+      const threadContent = messages.querySelector('.aiw-thread-content');
+      const likeButton = messages.querySelector('.aiw-like');
+      const dislikeButton = messages.querySelector('.aiw-dislike');
+      const feedbackText = messages.querySelector('.aiw-feedback-text');
+      const feedbackPrompt = messages.querySelector('.aiw-feedback-prompt');
+      const feedbackTicket = messages.querySelector('.aiw-feedback-ticket');
+      const ticketMeta = messages.querySelector('.aiw-ticket-meta');
+      const ticketDescription = messages.querySelector('.aiw-ticket-description');
+      const ticketLinkLabel = messages.querySelector('.aiw-ticket-link-label');
+
+      const chatStates = {
+        product: {
+          question: 'Как изменить карточку товара?',
+          context: 'Контекст: Каталог товаров',
+          heading: 'Что сделать',
+          answer: 'Откройте нужный товар в каталоге, измените название, цену, описание или изображение, затем сохраните изменения и опубликуйте страницу.',
+          source: 'Справка → Интернет-магазин',
+          ticket: false
+        },
+        ticket: {
+          question: 'Почему товар не виден?',
+          context: 'Контекст: Публикация',
+          heading: 'Почему товар может не отображаться',
+          answer: 'Проверьте, что товар активен, добавлен в нужную категорию и страница опубликована после последних изменений. Так как быстрые шаги не помогли, вопрос передан в поддержку.',
+          source: 'Справка → Отображение товаров',
+          ticket: true
+        },
+        domain: {
+          question: 'Как подключить домен?',
+          context: 'Контекст: Настройки сайта',
+          heading: 'Как подключить домен',
+          answer: 'Откройте Настройки сайта → Домен, укажите адрес и добавьте предложенные записи у регистратора. После обновления DNS нажмите «Проверить подключение».',
+          source: 'Справка → Подключение домена',
+          ticket: false
+        },
+        forms: {
+          question: 'Не приходят заявки из формы',
+          context: 'Контекст: Формы',
+          heading: 'Проверьте подключение формы',
+          answer: 'Убедитесь, что приемщик данных подключен в настройках формы, затем перепубликуйте страницу и отправьте тестовую заявку.',
+          source: 'Справка → Формы и заявки',
+          ticket: false
+        }
+      };
+
+      const setOpen = (open) => {
+        root.dataset.open = String(open);
+        launcher.setAttribute('aria-expanded', String(open));
+        if (open) window.setTimeout(() => input.focus(), 60);
+      };
+
+      launcher.addEventListener('click', () => setOpen(true));
+      close.addEventListener('click', () => setOpen(false));
+
+      const setView = (view, focusInput = true) => {
+        const isHistory = view === 'history';
+        root.dataset.view = isHistory ? 'history' : 'chat';
+        title.textContent = isHistory ? 'История' : 'AI-помощник Тильды';
+        historyToggle.setAttribute('aria-label', isHistory ? 'Вернуться в переписку' : 'Открыть историю переписок');
+        historyToggle.setAttribute('title', isHistory ? 'Назад к чату' : 'История');
+        historyToggleText.textContent = isHistory ? 'Назад' : 'История';
+        if (!isHistory && focusInput) window.setTimeout(() => input.focus(), 40);
+      };
+
+      historyToggle.addEventListener('click', () => {
+        setView(root.dataset.view === 'history' ? 'chat' : 'history');
+      });
+
+      newChat.addEventListener('click', () => {
+        input.value = '';
+        resizeInput();
+        clearGeneratedMessages();
+        chatCards.forEach((item) => item.removeAttribute('aria-current'));
+        threadContent.hidden = true;
+        emptyState.hidden = false;
+        setView('chat');
+        messages.scrollTo({ top: 0 });
+      });
+
+      const clearGeneratedMessages = () => {
+        messages.querySelectorAll('.aiw-generated').forEach((item) => item.remove());
+      };
+
+      const resetFeedback = () => {
+        likeButton.setAttribute('aria-pressed', 'false');
+        dislikeButton.setAttribute('aria-pressed', 'false');
+        feedbackText.textContent = 'Ответ помог?';
+        feedbackPrompt.hidden = true;
+      };
+
+      const applyChatState = (chatId) => {
+        const state = chatStates[chatId] || chatStates.product;
+        clearGeneratedMessages();
+        resetFeedback();
+        emptyState.hidden = true;
+        threadContent.hidden = false;
+        userBubble.textContent = state.question;
+        answerHeading.textContent = state.heading;
+        answerText.textContent = state.answer;
+        sourceLink.textContent = state.source;
+        ticketCard.hidden = !state.ticket;
+        if (state.ticket) {
+          ticketMeta.textContent = '№ 48291 · Поддержка Тильды';
+          ticketDescription.textContent = 'В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.';
+          ticketLinkLabel.textContent = 'Открыть тикет № 48291';
+        }
+      };
+
+      likeButton.addEventListener('click', () => {
+        const selected = likeButton.getAttribute('aria-pressed') === 'true';
+        likeButton.setAttribute('aria-pressed', String(!selected));
+        dislikeButton.setAttribute('aria-pressed', 'false');
+        feedbackPrompt.hidden = true;
+        feedbackText.textContent = selected ? 'Ответ помог?' : 'Спасибо за оценку';
+      });
+
+      dislikeButton.addEventListener('click', () => {
+        const selected = dislikeButton.getAttribute('aria-pressed') === 'true';
+        dislikeButton.setAttribute('aria-pressed', String(!selected));
+        likeButton.setAttribute('aria-pressed', 'false');
+        feedbackPrompt.hidden = selected;
+        feedbackText.textContent = selected ? 'Ответ помог?' : 'Ответ не помог';
+        if (!selected) window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
+      });
+
+      feedbackTicket.addEventListener('click', () => {
+        ticketMeta.textContent = '№ 48292 · Поддержка Тильды';
+        ticketDescription.textContent = 'В поддержку переданы ваш вопрос, ответ помощника и контекст текущего экрана. Специалист ответит в этом тикете.';
+        ticketLinkLabel.textContent = 'Открыть тикет № 48292';
+        ticketCard.hidden = false;
+        feedbackPrompt.hidden = true;
+        feedbackText.textContent = 'Тикет создан';
+        window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
+      });
+
+      chatCards.forEach((card) => {
+        card.addEventListener('click', () => {
+          chatCards.forEach((item) => item.removeAttribute('aria-current'));
+          card.setAttribute('aria-current', 'true');
+          applyChatState(card.dataset.chatId);
+          setView('chat', false);
+          window.setTimeout(() => {
+            messages.scrollTo({ top: card.dataset.chatId === 'ticket' ? messages.scrollHeight : 0, behavior: 'smooth' });
+          }, 70);
+        });
+      });
+
+      const resizeInput = () => {
+        input.style.height = 'auto';
+        input.style.height = `${Math.min(input.scrollHeight, 92)}px`;
+        send.disabled = !input.value.trim();
+      };
+
+      input.addEventListener('input', resizeInput);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          if (input.value.trim()) form.requestSubmit();
+        }
+      });
+
+      suggestions.forEach((button) => {
+        button.addEventListener('click', () => {
+          input.value = button.textContent.trim();
+          resizeInput();
+          input.focus();
+        });
+      });
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        if (!emptyState.hidden) emptyState.hidden = true;
+
+        const userRow = document.createElement('div');
+        userRow.className = 'aiw-row aiw-row-user aiw-generated';
+        const bubble = document.createElement('div');
+        bubble.className = 'aiw-user-bubble';
+        bubble.textContent = text;
+        userRow.appendChild(bubble);
+        messages.appendChild(userRow);
+
+        const typingRow = document.createElement('div');
+        typingRow.className = 'aiw-row aiw-generated';
+        typingRow.innerHTML = '<div class="aiw-typing" aria-label="AI печатает"><i></i><i></i><i></i></div>';
+        messages.appendChild(typingRow);
+
+        input.value = '';
+        resizeInput();
+        messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' });
+
+        window.setTimeout(() => {
+          typingRow.innerHTML = '<article class="aiw-answer"><div class="aiw-answer-label">✦ Ответ помощника</div><p>Это интерактивный мок. В рабочей версии здесь появится ответ из вашей базы знаний с учетом текущего экрана.</p></article>';
+          messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' });
+        }, 900);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && root.dataset.open === 'true') setOpen(false);
+      });
+    })();
+  </script>
+</body>
+</html>
