@@ -606,6 +606,11 @@
       background: var(--aiw-accent);
     }
 
+    .aiw-feedback .aiw-icon-button:disabled { cursor: default; }
+    .aiw-feedback .aiw-icon-button:disabled:not([aria-pressed="true"]) { opacity: .38; }
+
+    .aiw-generated-answer-wrap { width: 100%; }
+
     .aiw-feedback-prompt {
       margin-top: 8px;
       padding: 13px;
@@ -652,6 +657,41 @@
       border-radius: 16px;
       background: #fff;
     }
+
+    .aiw-composer[hidden], .aiw-note[hidden], .aiw-closed-composer[hidden] { display: none !important; }
+
+    .aiw-closed-composer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 58px;
+      padding: 10px 10px 10px 13px;
+      border: 1px solid #dededc;
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .aiw-closed-copy { min-width: 0; flex: 1 1 auto; }
+    .aiw-closed-copy strong { display: block; font-size: 12px; font-weight: 650; }
+    .aiw-closed-copy span { display: block; margin-top: 2px; color: #858585; font-size: 10px; line-height: 1.3; }
+
+    .aiw-new-question {
+      min-height: 38px;
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 11px;
+      color: #fff;
+      background: var(--aiw-accent);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .aiw-new-question:hover { background: #f25f4c; }
 
     .aiw-input {
       width: 100%;
@@ -895,10 +935,10 @@
         <section class="aiw-feedback-prompt" aria-label="Предложение создать тикет" hidden>
           <strong>Передать вопрос в поддержку?</strong>
           <p>К тикету приложим ваш вопрос, ответ помощника и контекст текущего экрана.</p>
-          <a class="aiw-feedback-ticket" href="https://tilda.cc/tickets" target="_blank" rel="noopener noreferrer">
+          <button class="aiw-feedback-ticket" type="button">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 5.5h11v7h-11v-7Zm2-2h7M8 8v2M7 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Создать тикет
-          </a>
+          </button>
         </section>
         </div>
       </div>
@@ -910,6 +950,10 @@
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m4 10 6-6 6 6M10 4v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </form>
+        <div class="aiw-closed-composer" role="status" hidden>
+          <span class="aiw-closed-copy"><strong class="aiw-closed-title">Вопрос закрыт</strong><span class="aiw-closed-text">Тикет создан — продолжение будет в поддержке</span></span>
+          <button class="aiw-new-question" type="button">Задать новый вопрос</button>
+        </div>
         <div class="aiw-note">AI может ошибаться — проверяйте важную информацию</div>
       </footer>
     </section>
@@ -929,6 +973,11 @@
       const form = root.querySelector('.aiw-composer');
       const input = root.querySelector('.aiw-input');
       const send = root.querySelector('.aiw-send');
+      const closedComposer = root.querySelector('.aiw-closed-composer');
+      const closedTitle = root.querySelector('.aiw-closed-title');
+      const closedText = root.querySelector('.aiw-closed-text');
+      const newQuestionButton = root.querySelector('.aiw-new-question');
+      const note = root.querySelector('.aiw-note');
       const messages = root.querySelector('.aiw-messages');
       const userBubble = messages.querySelector('.aiw-user-bubble');
       const answerHeading = messages.querySelector('.aiw-answer h2');
@@ -941,14 +990,19 @@
       const dislikeButton = messages.querySelector('.aiw-dislike');
       const feedbackText = messages.querySelector('.aiw-feedback-text');
       const feedbackPrompt = messages.querySelector('.aiw-feedback-prompt');
+      const feedbackTicketButton = messages.querySelector('.aiw-feedback-ticket');
       const ticketMeta = messages.querySelector('.aiw-ticket-meta');
       const ticketDescription = messages.querySelector('.aiw-ticket-description');
       const ticketLink = messages.querySelector('.aiw-ticket-link');
       const ticketLinkLabel = messages.querySelector('.aiw-ticket-link-label');
+      const defaultFeedback = {
+        like: likeButton,
+        dislike: dislikeButton,
+        text: feedbackText,
+        container: likeButton.closest('.aiw-feedback')
+      };
+      let activeFeedback = defaultFeedback;
       let requestVersion = 0;
-
-      // Эти элементы должны работать и в сохранённой переписке, и в новом пустом чате.
-      messages.append(ticketCard, feedbackPrompt);
 
       const chatStates = {
         product: {
@@ -1008,10 +1062,11 @@
         setView(root.dataset.view === 'history' ? 'chat' : 'history');
       });
 
-      newChat.addEventListener('click', () => {
+      const startNewChat = () => {
         input.value = '';
         resizeInput();
         clearGeneratedMessages();
+        resetFeedback();
         chatCards.forEach((item) => item.removeAttribute('aria-current'));
         threadContent.hidden = true;
         emptyState.hidden = false;
@@ -1019,7 +1074,10 @@
         feedbackPrompt.hidden = true;
         setView('chat');
         messages.scrollTo({ top: 0 });
-      });
+      };
+
+      newChat.addEventListener('click', startNewChat);
+      newQuestionButton.addEventListener('click', startNewChat);
 
       const clearGeneratedMessages = () => {
         requestVersion += 1;
@@ -1027,11 +1085,51 @@
         setComposerBusy(false);
       };
 
+      const setComposerClosed = (closed, reason = 'ticket') => {
+        form.hidden = closed;
+        closedComposer.hidden = !closed;
+        note.hidden = closed;
+        if (closed) {
+          const closedByLike = reason === 'like';
+          closedTitle.textContent = closedByLike ? 'Ответ помог' : 'Вопрос закрыт';
+          closedText.textContent = closedByLike ? 'Беседа закрыта' : 'Тикет создан — продолжение будет в поддержке';
+        }
+        if (!closed) window.setTimeout(() => {
+          if (!form.hidden) input.focus();
+        }, 40);
+      };
+
+      const resetFeedbackControls = (controls) => {
+        controls.like.disabled = false;
+        controls.dislike.disabled = false;
+        controls.like.setAttribute('aria-pressed', 'false');
+        controls.dislike.setAttribute('aria-pressed', 'false');
+        controls.text.textContent = 'Ответ помог?';
+      };
+
       const resetFeedback = () => {
-        likeButton.setAttribute('aria-pressed', 'false');
-        dislikeButton.setAttribute('aria-pressed', 'false');
-        feedbackText.textContent = 'Ответ помог?';
+        activeFeedback = defaultFeedback;
+        resetFeedbackControls(defaultFeedback);
         feedbackPrompt.hidden = true;
+        setComposerClosed(false);
+      };
+
+      const showCreatedTicket = (ticketNumber, description, controls = activeFeedback) => {
+        ticketMeta.textContent = `№ ${ticketNumber} · Поддержка Тильды`;
+        ticketDescription.textContent = description;
+        ticketLink.href = `https://tilda.cc/tickets/${ticketNumber}`;
+        ticketLinkLabel.textContent = `Открыть тикет № ${ticketNumber}`;
+        ticketCard.hidden = false;
+        feedbackPrompt.hidden = true;
+        controls.like.setAttribute('aria-pressed', 'false');
+        controls.dislike.setAttribute('aria-pressed', 'true');
+        controls.like.disabled = true;
+        controls.dislike.disabled = true;
+        controls.text.textContent = 'Тикет создан';
+        activeFeedback = controls;
+        controls.container.after(ticketCard);
+        setComposerClosed(true, 'ticket');
+        window.setTimeout(() => ticketCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 40);
       };
 
       const applyChatState = (chatId) => {
@@ -1046,33 +1144,46 @@
         sourceLink.textContent = state.source;
         ticketCard.hidden = !state.ticket;
         if (state.ticket) {
-          ticketMeta.textContent = '№ 48291 · Поддержка Тильды';
-          ticketDescription.textContent = 'В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.';
-          ticketLink.href = 'https://tilda.cc/tickets/48291';
-          ticketLinkLabel.textContent = 'Открыть тикет № 48291';
+          showCreatedTicket('48291', 'В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.', defaultFeedback);
         }
       };
 
-      likeButton.addEventListener('click', () => {
-        const selected = likeButton.getAttribute('aria-pressed') === 'true';
-        likeButton.setAttribute('aria-pressed', String(!selected));
-        dislikeButton.setAttribute('aria-pressed', 'false');
-        feedbackPrompt.hidden = true;
-        feedbackText.textContent = selected ? 'Ответ помог?' : 'Спасибо за оценку';
-      });
-
-      const openTicketPrompt = () => {
+      const openTicketPrompt = (controls) => {
+        activeFeedback = controls;
+        controls.container.after(feedbackPrompt);
         feedbackPrompt.hidden = false;
-        window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
+        window.setTimeout(() => feedbackPrompt.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 40);
       };
 
-      dislikeButton.addEventListener('click', () => {
-        const selected = dislikeButton.getAttribute('aria-pressed') === 'true';
-        dislikeButton.setAttribute('aria-pressed', String(!selected));
-        likeButton.setAttribute('aria-pressed', 'false');
-        feedbackPrompt.hidden = selected;
-        feedbackText.textContent = selected ? 'Ответ помог?' : 'Ответ не помог';
-        if (!selected) openTicketPrompt();
+      const wireFeedbackControls = (controls) => {
+        controls.like.addEventListener('click', () => {
+          if (controls.like.disabled) return;
+          const selected = controls.like.getAttribute('aria-pressed') === 'true';
+          activeFeedback = controls;
+          controls.like.setAttribute('aria-pressed', String(!selected));
+          controls.dislike.setAttribute('aria-pressed', 'false');
+          feedbackPrompt.hidden = true;
+          controls.text.textContent = selected ? 'Ответ помог?' : 'Спасибо за оценку';
+          setComposerClosed(!selected, selected ? 'ticket' : 'like');
+        });
+
+        controls.dislike.addEventListener('click', () => {
+          if (controls.dislike.disabled) return;
+          const selected = controls.dislike.getAttribute('aria-pressed') === 'true';
+          activeFeedback = controls;
+          controls.dislike.setAttribute('aria-pressed', String(!selected));
+          controls.like.setAttribute('aria-pressed', 'false');
+          controls.text.textContent = selected ? 'Ответ помог?' : 'Ответ не помог';
+          setComposerClosed(false);
+          feedbackPrompt.hidden = selected;
+          if (!selected) openTicketPrompt(controls);
+        });
+      };
+
+      wireFeedbackControls(defaultFeedback);
+
+      feedbackTicketButton.addEventListener('click', () => {
+        showCreatedTicket('48292', 'В поддержку переданы ваш вопрос, ответ AI-помощника и контекст текущего экрана. Специалист ответит в этом тикете.', activeFeedback);
       });
 
       chatCards.forEach((card) => {
@@ -1145,7 +1256,24 @@
         };
       };
 
+      const createFeedbackBlock = () => {
+        const feedback = document.createElement('div');
+        feedback.className = 'aiw-feedback';
+        feedback.innerHTML = '<span class="aiw-feedback-text">Ответ помог?</span><span class="aiw-feedback-buttons"><button class="aiw-icon-button aiw-like" type="button" aria-label="Ответ полезен" aria-pressed="false"><svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.5 15H4a1.5 1.5 0 0 1-1.5-1.5V8H6m.5 7h6.2c.7 0 1.3-.5 1.5-1.2l1.1-4.5a1.5 1.5 0 0 0-1.5-1.8H11l.5-2.5c.2-1-.6-2-1.6-2L6.5 8v7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="aiw-icon-button aiw-dislike" type="button" aria-label="Ответ не помог" aria-pressed="false"><svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M11.5 3H14a1.5 1.5 0 0 1 1.5 1.5V10H12m-.5-7H5.3c-.7 0-1.3.5-1.5 1.2L2.7 8.7a1.5 1.5 0 0 0 1.5 1.8H7L6.5 13c-.2 1 .6 2 1.6 2l3.4-5V3Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>';
+
+        const controls = {
+          like: feedback.querySelector('.aiw-like'),
+          dislike: feedback.querySelector('.aiw-dislike'),
+          text: feedback.querySelector('.aiw-feedback-text'),
+          container: feedback
+        };
+        wireFeedbackControls(controls);
+        return feedback;
+      };
+
       const renderMockAnswer = (row, response, elapsedSeconds) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'aiw-generated-answer-wrap';
         const article = document.createElement('article');
         article.className = 'aiw-answer';
 
@@ -1184,7 +1312,8 @@
         source.appendChild(sourceCopy);
 
         article.append(label, heading, intro, steps, outro, source);
-        row.replaceChildren(article);
+        wrapper.append(article, createFeedbackBlock());
+        row.replaceChildren(wrapper);
       };
 
       input.addEventListener('input', resizeInput);
