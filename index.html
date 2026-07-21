@@ -140,7 +140,7 @@
 
     .aiw-launcher:hover { transform: translateY(-2px); box-shadow: 0 16px 38px rgba(38,31,29,.24); }
     .aiw-launcher:focus-visible, .aiw-icon-button:focus-visible, .aiw-action:focus-visible,
-    .aiw-send:focus-visible, .aiw-suggestion:focus-visible {
+    .aiw-send:focus-visible, .aiw-history-ticket:focus-visible {
       outline: 3px solid rgba(255,107,87,.28);
       outline-offset: 2px;
     }
@@ -246,6 +246,12 @@
       border-bottom: 1px solid #e4e4e2;
     }
 
+    .aiw-history-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
     .aiw-new-chat {
       width: 100%;
       min-height: 46px;
@@ -264,6 +270,26 @@
     }
 
     .aiw-new-chat:hover { background: #f25f4c; }
+
+    .aiw-history-ticket {
+      width: 100%;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid #dededc;
+      border-radius: 14px;
+      color: #353535;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .aiw-history-ticket:hover { border-color: #ffc1b6; color: #d95746; background: #fff8f6; }
 
     .aiw-history-list {
       flex: 1;
@@ -528,6 +554,7 @@
       color: #4e3531;
       background: rgba(255,255,255,.76);
       font-size: 11px;
+      text-decoration: none;
       cursor: pointer;
     }
 
@@ -593,6 +620,7 @@
       background: var(--aiw-accent);
       font-size: 11px;
       font-weight: 600;
+      text-decoration: none;
       cursor: pointer;
     }
 
@@ -603,22 +631,6 @@
       border-top: 1px solid var(--aiw-line);
       background: rgba(247,247,246,.96);
     }
-
-    .aiw-suggestions { display: flex; gap: 7px; overflow-x: auto; padding: 0 2px 9px; scrollbar-width: none; }
-    .aiw-suggestions::-webkit-scrollbar { display: none; }
-
-    .aiw-suggestion {
-      flex: 0 0 auto;
-      padding: 7px 10px;
-      border: 1px solid #dededc;
-      border-radius: 999px;
-      color: #656565;
-      background: #fff;
-      font-size: 11px;
-      cursor: pointer;
-    }
-
-    .aiw-suggestion:hover { color: #202020; border-color: #c7c7c5; }
 
     .aiw-composer {
       display: flex;
@@ -747,10 +759,16 @@
 
       <section class="aiw-history" aria-label="История переписок">
         <div class="aiw-history-top">
-          <button class="aiw-new-chat" type="button">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 3v12M3 9h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-            Новый чат
-          </button>
+          <div class="aiw-history-actions">
+            <button class="aiw-new-chat" type="button">
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 3v12M3 9h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Новый чат
+            </button>
+            <a class="aiw-history-ticket" href="https://tilda.cc/tickets" target="_blank" rel="noopener noreferrer">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 5.5h11v7h-11v-7Zm2-2h7M8 8v2M7 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Создать тикет
+            </a>
+          </div>
         </div>
         <div class="aiw-history-list">
           <section class="aiw-history-section">
@@ -839,7 +857,7 @@
             <span class="aiw-ticket-copy"><strong>Тикет создан</strong><span class="aiw-ticket-meta">№ 48291 · Поддержка Тильды</span></span>
           </div>
           <p class="aiw-ticket-description">В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.</p>
-          <button class="aiw-ticket-link" type="button"><span class="aiw-ticket-link-label">Открыть тикет № 48291</span><span aria-hidden="true">→</span></button>
+          <a class="aiw-ticket-link" href="https://tilda.cc/tickets/48291" target="_blank" rel="noopener noreferrer"><span class="aiw-ticket-link-label">Открыть тикет № 48291</span><span aria-hidden="true">→</span></a>
         </section>
         <div class="aiw-feedback">
           <span class="aiw-feedback-text">Ответ помог?</span>
@@ -855,20 +873,15 @@
         <section class="aiw-feedback-prompt" aria-label="Предложение создать тикет" hidden>
           <strong>Передать вопрос в поддержку?</strong>
           <p>К тикету приложим ваш вопрос, ответ помощника и контекст текущего экрана.</p>
-          <button class="aiw-feedback-ticket" type="button">
+          <a class="aiw-feedback-ticket" href="https://tilda.cc/tickets" target="_blank" rel="noopener noreferrer">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 5.5h11v7h-11v-7Zm2-2h7M8 8v2M7 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Создать тикет
-          </button>
+          </a>
         </section>
         </div>
       </div>
 
       <footer class="aiw-composer-wrap aiw-view-chat">
-        <div class="aiw-suggestions">
-          <button class="aiw-suggestion" type="button">Как изменить цену?</button>
-          <button class="aiw-suggestion" type="button">Почему товар не виден?</button>
-          <button class="aiw-suggestion" type="button" data-action="ticket">Создать тикет</button>
-        </div>
         <form class="aiw-composer">
           <textarea class="aiw-input" rows="1" aria-label="Вопрос AI-помощнику Тильды" placeholder="Задайте уточняющий вопрос"></textarea>
           <button class="aiw-send" type="submit" aria-label="Отправить вопрос" disabled>
@@ -895,7 +908,6 @@
       const input = root.querySelector('.aiw-input');
       const send = root.querySelector('.aiw-send');
       const messages = root.querySelector('.aiw-messages');
-      const suggestions = root.querySelectorAll('.aiw-suggestion');
       const userBubble = messages.querySelector('.aiw-user-bubble');
       const answerHeading = messages.querySelector('.aiw-answer h2');
       const answerText = messages.querySelector('.aiw-answer p');
@@ -907,9 +919,9 @@
       const dislikeButton = messages.querySelector('.aiw-dislike');
       const feedbackText = messages.querySelector('.aiw-feedback-text');
       const feedbackPrompt = messages.querySelector('.aiw-feedback-prompt');
-      const feedbackTicket = messages.querySelector('.aiw-feedback-ticket');
       const ticketMeta = messages.querySelector('.aiw-ticket-meta');
       const ticketDescription = messages.querySelector('.aiw-ticket-description');
+      const ticketLink = messages.querySelector('.aiw-ticket-link');
       const ticketLinkLabel = messages.querySelector('.aiw-ticket-link-label');
 
       // Эти элементы должны работать и в сохранённой переписке, и в новом пустом чате.
@@ -1011,6 +1023,7 @@
         if (state.ticket) {
           ticketMeta.textContent = '№ 48291 · Поддержка Тильды';
           ticketDescription.textContent = 'В поддержку переданы ваш вопрос, ответ помощника и контекст экрана «Публикация». Специалист ответит в этом тикете.';
+          ticketLink.href = 'https://tilda.cc/tickets/48291';
           ticketLinkLabel.textContent = 'Открыть тикет № 48291';
         }
       };
@@ -1037,16 +1050,6 @@
         if (!selected) openTicketPrompt();
       });
 
-      feedbackTicket.addEventListener('click', () => {
-        ticketMeta.textContent = '№ 48292 · Поддержка Тильды';
-        ticketDescription.textContent = 'В поддержку переданы ваш вопрос, ответ помощника и контекст текущего экрана. Специалист ответит в этом тикете.';
-        ticketLinkLabel.textContent = 'Открыть тикет № 48292';
-        ticketCard.hidden = false;
-        feedbackPrompt.hidden = true;
-        feedbackText.textContent = 'Тикет создан';
-        window.setTimeout(() => messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' }), 40);
-      });
-
       chatCards.forEach((card) => {
         card.addEventListener('click', () => {
           chatCards.forEach((item) => item.removeAttribute('aria-current'));
@@ -1071,20 +1074,6 @@
           event.preventDefault();
           if (input.value.trim()) form.requestSubmit();
         }
-      });
-
-      suggestions.forEach((button) => {
-        button.addEventListener('click', () => {
-          if (button.dataset.action === 'ticket') {
-            input.value = '';
-            resizeInput();
-            openTicketPrompt();
-            return;
-          }
-          input.value = button.textContent.trim();
-          resizeInput();
-          input.focus();
-        });
       });
 
       form.addEventListener('submit', (event) => {
